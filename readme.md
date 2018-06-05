@@ -28,8 +28,6 @@ relevant errors on the worker or web processes.
 The PR will not undergo the linting or unit-testing jobs despite passing the
 build job.
 
-There are also numerous cases of this:
-
 # Unprocessed PRs - Case 3
 
 ![ss5](/ss5.png?raw=true)
