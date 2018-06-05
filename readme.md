@@ -1,14 +1,17 @@
+# Pipeline Structure
 Here is our pull requests pipeline:
 
 ![ss1](/ss1.png?raw=true)
 
 [Link to pipeline yaml](/pipeline-pull-requests.yaml)
 
+# Successfully Processed PRs
+
 Successfully processed PRs look like this:
 
 ![ss2](/ss2.png?raw=true)
 
-But there are numerous cases of this:
+# Unprocessed PRs - Case 1
 
 ![ss3](/ss3.png?raw=true)
 
@@ -18,7 +21,7 @@ job was never triggered.
 The deploy job for this PR will never trigger, despite that there are no
 relevant errors on the worker or web processes.
 
-There are also numerous cases of this:
+# Unprocessed PRs - Case 2
 
 ![ss4](/ss4.png?raw=true)
 
@@ -26,6 +29,8 @@ The PR will not undergo the linting or unit-testing jobs despite passing the
 build job.
 
 There are also numerous cases of this:
+
+# Unprocessed PRs - Case 3
 
 ![ss5](/ss5.png?raw=true)
 
