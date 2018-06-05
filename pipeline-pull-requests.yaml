@@ -1,0 +1,202 @@
+---
+resource_types:
+- name: pull-request
+  type: docker-image
+  source:
+    repository: jtarchie/pr
+
+- name: github-status
+  type: docker-image
+  source:
+    repository: dpb587/github-status-resource
+    tag: master
+
+resources:
+- name: pull-request
+  type: pull-request
+  source:
+    repo: quotecenter/app-thunder-storefront
+    access_token: ((github-token))
+    username: x-oauth-basic
+    password: ((github-token))
+  webhook_token: C8Xv4dQtA
+
+- name: docker-image
+  type: docker-image
+  source:
+    repository: gcr.io/np-quotecenter/app-thunder-storefront
+    username: _json_key
+    password: ((gcr-key))
+
+- name: github-status-build
+  type: github-status
+  source:
+    repository: quotecenter/app-thunder-storefront
+    access_token: ((github-token))
+    context: build
+
+- name: github-status-lint
+  type: github-status
+  source:
+    repository: quotecenter/app-thunder-storefront
+    access_token: ((github-token))
+    context: lint
+
+- name: github-status-unit-tests
+  type: github-status
+  source:
+    repository: quotecenter/app-thunder-storefront
+    access_token: ((github-token))
+    context: unit-tests
+
+jobs:
+- name: build
+  plan:
+  - get: app-thunder-storefront
+    resource: pull-request
+    trigger: true
+    version: every
+
+  - put: github-status-build
+    params:
+      commit: app-thunder-storefront/.git/head_sha
+      state: pending
+
+  - put: docker-image
+    params:
+      build: app-thunder-storefront
+      build_args:
+        NPM_TOKEN: ((myget-token))
+      tag: app-thunder-storefront/.git/head_sha
+      cache: true
+      cache_tag: latest
+    on_success:
+      put: github-status-build
+      params:
+        commit: app-thunder-storefront/.git/head_sha
+        state: success
+    on_failure:
+      put: github-status-build
+      params:
+        commit: app-thunder-storefront/.git/head_sha
+        state: failure
+
+- name: lint
+  plan:
+  - aggregate:
+    - get: app-thunder-storefront
+      resource: pull-request
+      passed: [build]
+      trigger: true
+      version: every
+
+    - get: docker-image
+      passed: [build]
+
+  - put: github-status-lint
+    params:
+      commit: app-thunder-storefront/.git/head_sha
+      state: pending
+
+  - task: lint
+    image: docker-image
+    config:
+      platform: linux
+      run:
+        path: sh
+        args:
+          - -c
+          - |
+            cd /opt/app
+            npm run lint
+            npm run lint-tests
+            npm run lint-sass
+    on_success:
+      put: github-status-lint
+      params:
+        commit: app-thunder-storefront/.git/head_sha
+        state: success
+    on_failure:
+      put: github-status-lint
+      params:
+        commit: app-thunder-storefront/.git/head_sha
+        state: failure
+
+- name: unit-tests
+  plan:
+  - aggregate:
+    - get: app-thunder-storefront
+      resource: pull-request
+      passed: [build]
+      trigger: true
+      version: every
+
+    - get: docker-image
+      passed: [build]
+
+  - put: github-status-unit-tests
+    params:
+      commit: app-thunder-storefront/.git/head_sha
+      state: pending
+
+  - task: unit-tests
+    image: docker-image
+    config:
+      platform: linux
+      run:
+        path: sh
+        args:
+          - -c
+          - |
+            cd /opt/app
+            npm test
+            npm run coverage-report
+            npm run check-coverage
+    on_success:
+      put: github-status-unit-tests
+      params:
+        commit: app-thunder-storefront/.git/head_sha
+        state: success
+    on_failure:
+      put: github-status-unit-tests
+      params:
+        commit: app-thunder-storefront/.git/head_sha
+        state: failure
+
+- name: deploy
+  plan:
+  - get: app-thunder-storefront
+    resource: pull-request
+    passed: [lint, unit-tests]
+    trigger: true
+    version: every
+
+  - task: trigger-deploy
+    config:
+      platform: linux
+      image_resource:
+        type: docker-image
+        source:
+          repository: gcr.io/np-quotecenter/ci/task-toolbox
+          username: _json_key
+          password: ((gcr-key))
+      inputs:
+      - name: app-thunder-storefront
+      params:
+        JENKINS_DEPLOY_TOKEN: ((jenkins-deploy-token))
+      run:
+        path: bash
+        args:
+          - -c
+          - |
+            GIT_HASH=`cat app-thunder-storefront/.git/head_sha`
+            PR_NUMBER=`cat app-thunder-storefront/.git/id`
+
+            echo "Triggering a release-candidate deploy of PR ${PR_NUMBER} with commit ${GIT_HASH}"
+            curl -k \
+                --data-urlencode "job=app-thunder-storefront" \
+                --data-urlencode "token=${JENKINS_DEPLOY_TOKEN}" \
+                --data-urlencode "APP_NAME=app-thunder-storefront-pr-${PR_NUMBER}" \
+                --data-urlencode "DOCKER_TAG=${GIT_HASH}" \
+                --data-urlencode "GIT_HASH=${GIT_HASH}" \
+                https://icp-deploy.np-quotecenter.net/buildByToken/buildWithParameters
