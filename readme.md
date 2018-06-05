@@ -35,8 +35,10 @@ build job.
 The PR will never even begin the build job at all.
 
 At first we thought this may be an issue with the pull request Concourse resource:
+
 https://github.com/jtarchie/github-pullrequest-resource/issues/178
 
 But now I believe it is a more insidious issue with Concourse itself:
+
 https://github.com/concourse/concourse/issues/1298
 
