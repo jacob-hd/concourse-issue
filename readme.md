@@ -1,3 +1,14 @@
+# What's the problem?
+Concourse seems to be ignoring resources that are ready to be processed instead
+of running the jobs that should be processing said resources.
+
+This seems to happen often, without rhyme or reason, with the "Pull Request"
+resource specifically.
+
+Neither the `concourse-web` nor the `concourse-worker` services are reporting
+any errors that seem to be related to this issue. The logs seem to indicate
+all is well.
+
 # Pipeline Structure
 Here is our pull requests pipeline:
 
